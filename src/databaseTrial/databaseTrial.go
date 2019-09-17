@@ -8,12 +8,22 @@ import (
 	"net/http"
 	"strconv"
 	"strings"
+
+	_ "github.com/go-sql-driver/mysql"
 )
 
 //HTTPPOSTTestCase is the data format for passing data
 type HTTPPOSTTestCase struct {
 	Name string `json:"name"`
 	Age  int    `json:"age"`
+}
+
+//HTTPDBTestCase is the struct from csv
+type HTTPDBTestCase struct {
+	Method string `json:"method"`
+	ID     string `json:"id"`
+	Name   string `json:"name"`
+	Age    string `json:"age"`
 }
 
 //ResponseObject for response
@@ -45,8 +55,8 @@ func DBReqHandler(w http.ResponseWriter, r *http.Request) {
 			// fmt.Fprintf(w, "Hello %v! \n Your Age is %v", name, age)
 
 			res, _ := insertCustomer(name, age)
-			log.Print(string(res))
-			json.NewEncoder(w).Encode(string(res))
+			log.Print(res)
+			json.NewEncoder(w).Encode(res)
 			return
 		}
 		fmt.Fprint(w, "Hello HTTP!")
@@ -56,6 +66,12 @@ func DBReqHandler(w http.ResponseWriter, r *http.Request) {
 			panic(err)
 		}
 		json.NewEncoder(w).Encode(data)
+		return
+	} else {
+		res := ResponseObject{
+			Message: "Wrong Method!",
+		}
+		json.NewEncoder(w).Encode(res)
 		return
 	}
 
@@ -78,18 +94,18 @@ func PUTHandler(w http.ResponseWriter, r *http.Request) {
 		age := data.Age
 
 		res, _ := SetCustomers(id, name, age)
-		json.NewEncoder(w).Encode(string(res))
-		return
-	} else {
-		res, _ := json.Marshal(&ResponseObject{
-			Message: "Wrong Method!",
-		})
-		json.NewEncoder(w).Encode(string(res))
+		json.NewEncoder(w).Encode(res)
 		return
 	}
+	res := ResponseObject{
+		Message: "Wrong Method!",
+	}
+	json.NewEncoder(w).Encode(res)
+	return
+
 }
 
-func insertCustomer(name string, age int) ([]byte, error) {
+func insertCustomer(name string, age int) (ResponseObject, error) {
 	db, err := sql.Open("mysql", "protim:password@tcp(127.0.0.1:3306)/test2")
 	defer db.Close()
 	if err != nil {
@@ -103,9 +119,9 @@ func insertCustomer(name string, age int) ([]byte, error) {
 	if err != nil {
 		panic(err.Error())
 	}
-	return json.Marshal(&ResponseObject{
+	return ResponseObject{
 		Message: "Customer Added!",
-	})
+	}, nil
 }
 
 func getCustomers() ([]Customer, error) {
@@ -145,7 +161,12 @@ func getCustomers() ([]Customer, error) {
 }
 
 //SetCustomers to edit customers
-func SetCustomers(customerID int, name string, age int) ([]byte, error) {
+func SetCustomers(customerID int, name string, age int) (ResponseObject, error) {
+	if customerID < 1 {
+		return ResponseObject{
+			Message: "ID cannot be less than 1!",
+		}, nil
+	}
 	db, err := sql.Open("mysql", "protim:password@tcp(127.0.0.1:3306)/test2")
 	defer db.Close()
 	if err != nil {
@@ -156,7 +177,7 @@ func SetCustomers(customerID int, name string, age int) ([]byte, error) {
 	if err != nil {
 		panic(err.Error())
 	}
-	return json.Marshal(&ResponseObject{
+	return ResponseObject{
 		Message: "Customer Updated!",
-	})
+	}, nil
 }
